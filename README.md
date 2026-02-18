@@ -140,6 +140,7 @@ MimiClaw stores everything as plain text files you can read and edit:
 |------|------------|
 | `SOUL.md` | The bot's personality — edit this to change how it behaves |
 | `USER.md` | Info about you — name, preferences, language |
+| `AGENTS.md` | Behavior guardrails — runtime rules and operating constraints |
 | `MEMORY.md` | Long-term memory — things the bot should always remember |
 | `HEARTBEAT.md` | Task list the bot checks periodically and acts on autonomously |
 | `cron.json` | Scheduled jobs — recurring or one-shot tasks created by the AI |
@@ -183,12 +184,32 @@ This turns MimiClaw into a proactive assistant — write tasks to `HEARTBEAT.md`
 - **Heartbeat** — periodically checks a task file and prompts the AI to act autonomously
 - **Tool use** — ReAct agent loop with tool calling for both providers
 
+
+## Codebase Tour
+
+If you want to quickly explore the firmware internals:
+
+- `main/mimi.c` — startup orchestration, subsystem initialization, task bootstrapping
+- `main/agent/` — context assembly + ReAct-style agent loop
+- `main/llm/` — Anthropic/OpenAI request/response handling
+- `main/tools/` — tool registry and built-in tools (`web_search`, time, cron, files)
+- `main/memory/` — persistent memory and session history management
+- `main/telegram/` + `main/gateway/` — Telegram and WebSocket channels
+- `main/cli/` — serial runtime configuration + debugging commands
+
+For Codex contributors, see `CODEX.md`. Runtime behavior guidance is documented in `AGENTS.md`.
+
 ## For Developers
 
 Technical details live in the `docs/` folder:
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — system design, module map, task layout, memory budget, protocols, flash partitions
 - **[docs/TODO.md](docs/TODO.md)** — feature gap tracker and roadmap
+
+Repository-level operation docs:
+
+- **[CODEX.md](CODEX.md)** — codex-oriented quick reference for navigating and shipping firmware changes
+- **[AGENTS.md](AGENTS.md)** — assistant behavior guardrails for runtime prompt composition
 
 ## License
 

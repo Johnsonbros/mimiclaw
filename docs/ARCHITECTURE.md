@@ -225,22 +225,41 @@ Session files are JSONL (one JSON object per line):
 
 ## Configuration
 
-All configuration is done exclusively through `mimi_secrets.h` at build time. There is no runtime configuration — changing any setting requires `idf.py fullclean && idf.py build`.
+MimiClaw uses a two-layer configuration model:
+
+1. **Build-time defaults** from `mimi_secrets.h`
+2. **Runtime overrides** set from serial CLI and stored in NVS
+
+Runtime NVS values take precedence over build-time defaults, so most operational changes do not require reflashing.
 
 | Define                       | Description                             |
 |------------------------------|-----------------------------------------|
 | `MIMI_SECRET_WIFI_SSID`     | WiFi SSID                               |
 | `MIMI_SECRET_WIFI_PASS`     | WiFi password                           |
 | `MIMI_SECRET_TG_TOKEN`      | Telegram Bot API token                  |
-| `MIMI_SECRET_API_KEY`       | Anthropic API key                       |
-| `MIMI_SECRET_MODEL`         | Model ID (default: claude-opus-4-6)     |
+| `MIMI_SECRET_API_KEY`       | Provider API key (Anthropic/OpenAI)     |
+| `MIMI_SECRET_MODEL_PROVIDER`| Provider selector (`anthropic`/`openai`)|
+| `MIMI_SECRET_MODEL`         | Model ID (provider-specific)             |
 | `MIMI_SECRET_PROXY_HOST`    | HTTP proxy hostname/IP (optional)       |
 | `MIMI_SECRET_PROXY_PORT`    | HTTP proxy port (optional)              |
 | `MIMI_SECRET_SEARCH_KEY`    | Brave Search API key (optional)         |
 
-NVS is still initialized (required by ESP-IDF WiFi internals) but is not used for application configuration.
+NVS is initialized for both ESP-IDF internals and MimiClaw runtime configuration persistence.
 
 ---
+
+
+## Runtime Prompt Inputs
+
+The system prompt is assembled from static instructions plus persisted files:
+
+- `SOUL.md` — assistant personality/voice
+- `USER.md` — user profile/preferences
+- `AGENTS.md` — operational behavior guardrails
+- `MEMORY.md` + recent daily notes — persistent memory context
+- Skill summaries from `/spiffs/skills/`
+
+A repo-level `CODEX.md` is included for developer/operator navigation and maintenance workflows.
 
 ## Message Bus Protocol
 

@@ -59,8 +59,8 @@
 
 ### [ ] Full Bootstrap File Alignment
 - **nanobot**: Loads `AGENTS.md`, `SOUL.md`, `USER.md`, `TOOLS.md`, `IDENTITY.md` (5 files)
-- **MimiClaw**: Only loads `SOUL.md` and `USER.md`
-- **Recommendation**: Add AGENTS.md (behavior guidelines) and TOOLS.md (tool documentation)
+- **MimiClaw**: Loads `SOUL.md`, `USER.md`, and `AGENTS.md`; `TOOLS.md`/`IDENTITY.md` are still pending
+- **Recommendation**: Add `TOOLS.md` (tool documentation) and `IDENTITY.md` for explicit assistant identity framing
 
 ### [ ] Longer Memory Lookback
 - **nanobot**: `memory.py` L56-80 — `get_recent_memories(days=7)` defaults to 7 days
