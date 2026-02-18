@@ -68,6 +68,7 @@ esp_err_t context_build_system_prompt(char *buf, size_t size)
     /* Bootstrap files */
     off = append_file(buf, size, off, MIMI_SOUL_FILE, "Personality");
     off = append_file(buf, size, off, MIMI_USER_FILE, "User Info");
+    off = append_file(buf, size, off, MIMI_AGENTS_FILE, "Agent Rules");
 
     /* Long-term memory */
     char mem_buf[4096];
