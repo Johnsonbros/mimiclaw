@@ -15,6 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup mimi_secrets.h
+        shell: bash
+        run: |
+          cp main/mimi_secrets.h.example main/mimi_secrets.h
+
       - name: Build firmware
         shell: bash
         run: |
