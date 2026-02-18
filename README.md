@@ -206,6 +206,7 @@ Technical details live in the `docs/` folder:
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — system design, module map, task layout, memory budget, protocols, flash partitions
 - **[docs/TODO.md](docs/TODO.md)** — feature gap tracker and roadmap
 - **[docs/GUI_A2UI.md](docs/GUI_A2UI.md)** — how to add a richer GUI/A2UI-style interface on ESP32-S3 boards
+- **[docs/hardware/WAVESHARE_ESP32_S3_TOUCH_LCD_1_46B.md](docs/hardware/WAVESHARE_ESP32_S3_TOUCH_LCD_1_46B.md)** — Waveshare 1.46B hardware map, board bring-up notes, and UI/display integration plan
 
 Repository-level operation docs:
 

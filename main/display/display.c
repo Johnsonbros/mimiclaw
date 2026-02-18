@@ -12,6 +12,7 @@
 #include "display/Vernon_ST7789T/Vernon_ST7789T.h"
 #include "display/font5x7.h"
 #include "qrcode.h"
+#include "board/board_pins.h"
 
 #define LCD_HOST  SPI3_HOST
 
@@ -25,13 +26,13 @@
 #define BANNER_W               320
 #define BANNER_H               172
 
-#define LCD_PIN_SCLK           40
-#define LCD_PIN_MOSI           45
-#define LCD_PIN_MISO           -1
-#define LCD_PIN_DC             41
-#define LCD_PIN_RST            39
-#define LCD_PIN_CS             42
-#define LCD_PIN_BK_LIGHT       46
+#define LCD_PIN_SCLK           BOARD_LCD_SPI_SCLK
+#define LCD_PIN_MOSI           BOARD_LCD_SPI_MOSI
+#define LCD_PIN_MISO           BOARD_LCD_SPI_MISO
+#define LCD_PIN_DC             BOARD_LCD_SPI_DC
+#define LCD_PIN_RST            BOARD_LCD_SPI_RST
+#define LCD_PIN_CS             BOARD_LCD_SPI_CS
+#define LCD_PIN_BK_LIGHT       BOARD_LCD_BACKLIGHT
 
 #define LCD_X_GAP              34
 #define LCD_Y_GAP              0
@@ -47,6 +48,10 @@
 #define BACKLIGHT_STEP_PERCENT 10
 
 static const char *TAG = "display";
+
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+#error "Waveshare 1.46B uses QSPI LCD + EXIO reset; add QSPI panel implementation before selecting this profile"
+#endif
 
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static uint8_t backlight_percent = 50;

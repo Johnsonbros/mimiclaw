@@ -3,9 +3,10 @@
 #include <stdio.h>
 #include <stdbool.h>  
 #include "buttons/multi_button.h"
+#include "board/board_pins.h"
 
 
-#define BOOT_KEY_PIN     0
+#define BOOT_KEY_PIN     BOARD_BUTTON_BOOT
 
 #define Button_PIN1   BOOT_KEY_PIN
 
