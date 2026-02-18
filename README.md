@@ -205,6 +205,7 @@ Technical details live in the `docs/` folder:
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — system design, module map, task layout, memory budget, protocols, flash partitions
 - **[docs/TODO.md](docs/TODO.md)** — feature gap tracker and roadmap
+- **[docs/GUI_A2UI.md](docs/GUI_A2UI.md)** — how to add a richer GUI/A2UI-style interface on ESP32-S3 boards
 
 Repository-level operation docs:
 
