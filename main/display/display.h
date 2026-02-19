@@ -21,6 +21,9 @@ bool display_get_banner_center_rgb(uint8_t *r, uint8_t *g, uint8_t *b);
 void display_show_config_screen(const char *qr_text, const char *ip_text,
                                 const char **lines, size_t line_count, size_t scroll,
                                 size_t selected, int selected_offset_px);
+void display_show_standard_ui_screen(const char *title, const char *subtitle,
+                                     const char *status_chip, const char **lines,
+                                     size_t line_count, const char *footer_hint);
 
 #ifdef __cplusplus
 }

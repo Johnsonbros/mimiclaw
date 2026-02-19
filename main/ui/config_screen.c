@@ -11,6 +11,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "ui/standard_ui.h"
 
 #define CONFIG_LINE_MAX 64
 #define CONFIG_LINES_MAX 12
@@ -153,6 +154,10 @@ void config_screen_toggle(void)
         s_active = false;
         display_show_banner();
         return;
+    }
+
+    if (standard_ui_is_active()) {
+        standard_ui_toggle();
     }
 
     build_config_lines();

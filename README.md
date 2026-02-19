@@ -183,6 +183,7 @@ This turns MimiClaw into a proactive assistant — write tasks to `HEARTBEAT.md`
 - **Cron scheduler** — the AI can schedule its own recurring and one-shot tasks, persisted across reboots
 - **Heartbeat** — periodically checks a task file and prompts the AI to act autonomously
 - **Tool use** — ReAct agent loop with tool calling for both providers
+- **Standard device UI** — built-in 3-screen dashboard (system, setup, assistant) for board-level testing
 
 
 ## Codebase Tour
