@@ -5,6 +5,7 @@
 #include "driver/gpio.h" 
 #include "display/display.h"
 #include "ui/config_screen.h"
+#include "ui/standard_ui.h"
 
 void  ESP32_Button_init(void){
   gpio_reset_pin(Button_PIN1);                        
@@ -34,6 +35,8 @@ void Button_SINGLE_CLICK_Callback(void* btn){
     BOOT_KEY_State = SINGLE_CLICK;                    
     if (config_screen_is_active()) {
       config_screen_scroll_down();
+    } else if (standard_ui_is_active()) {
+      standard_ui_refresh();
     } else {
       display_cycle_backlight();
     }
@@ -43,12 +46,22 @@ void Button_DOUBLE_CLICK_Callback(void* btn){
   struct Button *user_button = (struct Button *)btn;        
   if(user_button == &BUTTON1){            
     BOOT_KEY_State = DOUBLE_CLICK;                
+    if (!config_screen_is_active()) {
+      if (!standard_ui_is_active()) {
+        standard_ui_toggle();
+      } else {
+        standard_ui_next_screen();
+      }
+    }
   }
 }
 void Button_LONG_PRESS_START_Callback(void* btn){        
   struct Button *user_button = (struct Button *)btn;    
   if(user_button == &BUTTON1){                      
     BOOT_KEY_State= LONG_PRESS_START;                
+    if (standard_ui_is_active()) {
+      standard_ui_toggle();
+    }
   }
 }
 void button_Init(void)
@@ -72,4 +85,3 @@ void button_Init(void)
   BOOT_KEY_State = NONE_PRESS;              
   button_start(&BUTTON1);                                                   
 }
-

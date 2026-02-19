@@ -10,6 +10,7 @@ idf_component_register(
         "imu/QMI8658.c"
         "imu/imu_manager.c"
         "ui/config_screen.c"
+        "ui/standard_ui.c"
         "bus/message_bus.c"
         "wifi/wifi_manager.c"
         "telegram/telegram_bot.c"

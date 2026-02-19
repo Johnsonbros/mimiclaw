@@ -24,6 +24,7 @@
 #include "display/display.h"
 #include "buttons/button_driver.h"
 #include "ui/config_screen.h"
+#include "ui/standard_ui.h"
 #include "imu/imu_manager.h"
 #include "rgb/rgb.h"
 #include "skills/skill_loader.h"
@@ -110,6 +111,7 @@ void app_main(void)
     rgb_set(255, 0, 0);
     button_Init();
     config_screen_init();
+    standard_ui_init();
     imu_manager_init();
     imu_manager_set_shake_callback(config_screen_toggle);
 

@@ -376,6 +376,52 @@ void display_show_config_screen(const char *qr_text, const char *ip_text,
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, BANNER_W, BANNER_H, framebuffer));
 }
 
+void display_show_standard_ui_screen(const char *title, const char *subtitle,
+                                     const char *status_chip, const char **lines,
+                                     size_t line_count, const char *footer_hint)
+{
+    if (!panel_handle) {
+        ESP_LOGW(TAG, "display not initialized");
+        return;
+    }
+    if (!title || !subtitle || !status_chip || !lines || !footer_hint) {
+        return;
+    }
+
+    fb_ensure();
+    if (!framebuffer) {
+        ESP_LOGW(TAG, "framebuffer alloc failed");
+        return;
+    }
+
+    const uint16_t color_bg = rgb565(8, 12, 20);
+    const uint16_t color_header = rgb565(23, 42, 74);
+    const uint16_t color_card = rgb565(16, 24, 38);
+    const uint16_t color_fg = rgb565(230, 237, 246);
+    const uint16_t color_muted = rgb565(135, 154, 180);
+    const uint16_t color_chip = rgb565(68, 189, 120);
+    const uint16_t color_footer = rgb565(37, 51, 74);
+
+    fb_fill_rect(0, 0, BANNER_W, BANNER_H, color_bg);
+    fb_fill_rect(0, 0, BANNER_W, 26, color_header);
+    fb_fill_rect(8, 32, BANNER_W - 16, BANNER_H - 52, color_card);
+    fb_fill_rect(BANNER_W - 86, 4, 78, 16, color_chip);
+    fb_fill_rect(0, BANNER_H - 18, BANNER_W, 18, color_footer);
+
+    fb_draw_text_clipped(6, 6, title, color_fg, 12, 2, 0, BANNER_W);
+    fb_draw_text_clipped(10, 38, subtitle, color_muted, 10, 1, 10, BANNER_W - 10);
+    fb_draw_text_clipped(BANNER_W - 82, 8, status_chip, color_bg, 10, 1, BANNER_W - 84, BANNER_W - 6);
+
+    const int start_y = 54;
+    const int line_h = 14;
+    for (size_t i = 0; i < line_count; i++) {
+        fb_draw_text_clipped(12, start_y + ((int)i * line_h), lines[i], color_fg, line_h, 1, 12, BANNER_W - 12);
+    }
+
+    fb_draw_text_clipped(8, BANNER_H - 14, footer_hint, color_muted, 10, 1, 8, BANNER_W - 8);
+    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, BANNER_W, BANNER_H, framebuffer));
+}
+
 bool display_get_banner_center_rgb(uint8_t *r, uint8_t *g, uint8_t *b)
 {
     if (!r || !g || !b) {
