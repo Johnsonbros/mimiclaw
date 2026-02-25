@@ -8,12 +8,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     container:
       image: espressif/idf:v5.5.2
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup mimi_secrets.h
+        shell: bash
+        run: |
+          cp main/mimi_secrets.h.example main/mimi_secrets.h
 
       - name: Build firmware
         shell: bash
