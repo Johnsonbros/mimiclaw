@@ -48,7 +48,7 @@
 #define MIMI_TG_POLL_CORE            0
 
 /* Agent Loop */
-#define MIMI_AGENT_STACK             (12 * 1024)
+#define MIMI_AGENT_STACK             (24 * 1024)
 #define MIMI_AGENT_PRIO              6
 #define MIMI_AGENT_CORE              1
 #define MIMI_AGENT_MAX_HISTORY       20
@@ -96,6 +96,15 @@
 #define MIMI_CLI_STACK               (4 * 1024)
 #define MIMI_CLI_PRIO                3
 #define MIMI_CLI_CORE                0
+
+/* Cron Service */
+#define MIMI_CRON_MAX_JOBS           8
+#define MIMI_CRON_FILE               "/spiffs/config/cron.json"
+#define MIMI_CRON_CHECK_INTERVAL_MS  60000
+
+/* Heartbeat */
+#define MIMI_HEARTBEAT_INTERVAL_MS   300000
+#define MIMI_HEARTBEAT_FILE          "/spiffs/config/HEARTBEAT.md"
 
 /* NVS Namespaces */
 #define MIMI_NVS_WIFI                "wifi_config"

@@ -1,2 +1,12 @@
 # MimiClaw - Common Default Configuration
 # Target-specific settings are in sdkconfig.defaults.esp32s3
+
+# LVGL fonts (needed for Waveshare profile display)
+CONFIG_LV_FONT_MONTSERRAT_12=y
+CONFIG_LV_FONT_MONTSERRAT_14=y
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+CONFIG_LV_FONT_MONTSERRAT_28=y
+
+# LVGL color settings — SPI/QSPI LCDs expect big-endian RGB565
+CONFIG_LV_COLOR_16_SWAP=y

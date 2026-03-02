@@ -140,6 +140,123 @@ static esp_err_t ws_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* ── Dashboard HTML ─────────────────────────── */
+static const char DASHBOARD_HTML[] =
+"<!DOCTYPE html>"
+"<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+"<title>DOT - AiSync Services</title>"
+"<style>"
+"*{margin:0;padding:0;box-sizing:border-box}"
+"body{font-family:-apple-system,system-ui,sans-serif;background:#0a0e17;color:#e0e0e0;height:100vh;display:flex;flex-direction:column}"
+"header{background:#111827;padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #1f2937}"
+"header .dot{width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e}"
+"header h1{font-size:18px;font-weight:600;color:#fff}"
+"header span{color:#6b7280;font-size:13px}"
+".chat{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}"
+".msg{max-width:80%;padding:12px 16px;border-radius:16px;font-size:14px;line-height:1.5;word-wrap:break-word;white-space:pre-wrap}"
+".msg.user{align-self:flex-end;background:#2563eb;color:#fff;border-bottom-right-radius:4px}"
+".msg.dot{align-self:flex-start;background:#1f2937;color:#e5e7eb;border-bottom-left-radius:4px}"
+".msg.dot .name{font-size:11px;color:#8899aa;margin-bottom:4px;font-weight:600}"
+".msg.system{align-self:center;background:transparent;color:#6b7280;font-size:12px;padding:4px}"
+".typing{align-self:flex-start;color:#6b7280;font-size:13px;padding:4px 16px}"
+"footer{background:#111827;padding:12px 20px;border-top:1px solid #1f2937;display:flex;gap:10px}"
+"footer input{flex:1;background:#1f2937;border:1px solid #374151;border-radius:12px;padding:12px 16px;color:#fff;font-size:14px;outline:none}"
+"footer input:focus{border-color:#2563eb}"
+"footer button{background:#2563eb;color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:14px;cursor:pointer;font-weight:500}"
+"footer button:hover{background:#1d4ed8}"
+"footer button:disabled{background:#374151;cursor:default}"
+".status{display:flex;gap:16px;padding:8px 20px;background:#0d1117;font-size:12px;color:#6b7280;border-top:1px solid #1f2937}"
+".status span{display:flex;align-items:center;gap:4px}"
+"</style></head><body>"
+"<header>"
+"<div class='dot' id='status-dot'></div>"
+"<h1>DOT</h1>"
+"<span>AiSync Services</span>"
+"</header>"
+"<div class='chat' id='chat'></div>"
+"<div class='status'>"
+"<span id='ws-status'>Connecting...</span>"
+"<span id='ip-info'></span>"
+"</div>"
+"<footer>"
+"<input id='input' placeholder='Talk to DOT...' autocomplete='off'>"
+"<button id='send' onclick='sendMsg()'>Send</button>"
+"</footer>"
+"<script>"
+"const chat=document.getElementById('chat');"
+"const input=document.getElementById('input');"
+"const sendBtn=document.getElementById('send');"
+"const wsStatus=document.getElementById('ws-status');"
+"const statusDot=document.getElementById('status-dot');"
+"const ipInfo=document.getElementById('ip-info');"
+"let ws,typing=null;"
+""
+"function connect(){"
+"const host=location.host||'192.168.1.209:18789';"
+"wsStatus.textContent='Connecting...';"
+"statusDot.style.background='#eab308';"
+"ws=new WebSocket('ws://'+host+'/ws');"
+"ws.onopen=()=>{"
+"wsStatus.textContent='Connected';"
+"statusDot.style.background='#22c55e';"
+"ipInfo.textContent=host;"
+"addMsg('system','Connected to DOT');"
+"sendBtn.disabled=false;"
+"};"
+"ws.onclose=()=>{"
+"wsStatus.textContent='Disconnected';"
+"statusDot.style.background='#ef4444';"
+"sendBtn.disabled=true;"
+"setTimeout(connect,3000);"
+"};"
+"ws.onerror=()=>{};"
+"ws.onmessage=(e)=>{"
+"clearTyping();"
+"try{const d=JSON.parse(e.data);if(d.content)addMsg('dot',d.content);}catch(x){addMsg('dot',e.data);}"
+"};"
+"}"
+""
+"function addMsg(type,text){"
+"const d=document.createElement('div');"
+"d.className='msg '+type;"
+"if(type==='dot'){d.innerHTML='<div class=\"name\">DOT</div>'+escHtml(text);}else if(type==='user'){d.textContent=text;}else{d.textContent=text;}"
+"chat.appendChild(d);"
+"chat.scrollTop=chat.scrollHeight;"
+"}"
+""
+"function escHtml(t){const d=document.createElement('span');d.textContent=t;return d.innerHTML;}"
+""
+"function showTyping(){"
+"if(typing)return;"
+"typing=document.createElement('div');"
+"typing.className='typing';"
+"typing.textContent='DOT is thinking...';"
+"chat.appendChild(typing);"
+"chat.scrollTop=chat.scrollHeight;"
+"}"
+""
+"function clearTyping(){if(typing){typing.remove();typing=null;}}"
+""
+"function sendMsg(){"
+"const t=input.value.trim();"
+"if(!t||!ws||ws.readyState!==1)return;"
+"addMsg('user',t);"
+"ws.send(JSON.stringify({type:'message',content:t}));"
+"input.value='';"
+"showTyping();"
+"}"
+""
+"input.addEventListener('keydown',(e)=>{if(e.key==='Enter')sendMsg();});"
+"connect();"
+"</script></body></html>";
+
+static esp_err_t dashboard_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/html");
+    return httpd_resp_send(req, DASHBOARD_HTML, strlen(DASHBOARD_HTML));
+}
+
+/* ── Server start ───────────────────────────── */
 esp_err_t ws_server_start(void)
 {
     memset(s_clients, 0, sizeof(s_clients));
@@ -148,6 +265,7 @@ esp_err_t ws_server_start(void)
     config.server_port = MIMI_WS_PORT;
     config.ctrl_port = MIMI_WS_PORT + 1;
     config.max_open_sockets = MIMI_WS_MAX_CLIENTS;
+    config.max_uri_handlers = 4;
 
     esp_err_t ret = httpd_start(&s_server, &config);
     if (ret != ESP_OK) {
@@ -155,9 +273,17 @@ esp_err_t ws_server_start(void)
         return ret;
     }
 
-    /* Register WebSocket URI */
-    httpd_uri_t ws_uri = {
+    /* Dashboard page */
+    httpd_uri_t dash_uri = {
         .uri = "/",
+        .method = HTTP_GET,
+        .handler = dashboard_handler,
+    };
+    httpd_register_uri_handler(s_server, &dash_uri);
+
+    /* WebSocket endpoint */
+    httpd_uri_t ws_uri = {
+        .uri = "/ws",
         .method = HTTP_GET,
         .handler = ws_handler,
         .is_websocket = true,

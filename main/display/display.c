@@ -6,36 +6,23 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "driver/ledc.h"
-#include "driver/spi_master.h"
-#include "esp_lcd_panel_io.h"
-#include "esp_lcd_panel_ops.h"
-#include "display/Vernon_ST7789T/Vernon_ST7789T.h"
-#include "display/font5x7.h"
-#include "qrcode.h"
+#include "display/display_panel.h"
 #include "board/board_pins.h"
 
-#define LCD_HOST  SPI3_HOST
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_XIAOZHI_ST7789
+#include "display/font5x7.h"
+#include "qrcode.h"
+#endif
 
-#define LCD_PIXEL_CLOCK_HZ     (12 * 1000 * 1000)
-#define LCD_CMD_BITS           8
-#define LCD_PARAM_BITS         8
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+#include "lvgl.h"
+#include "ui/lvgl_adapter.h"
 
-#define LCD_H_RES              172
-#define LCD_V_RES              320
-
-#define BANNER_W               320
-#define BANNER_H               172
-
-#define LCD_PIN_SCLK           BOARD_LCD_SPI_SCLK
-#define LCD_PIN_MOSI           BOARD_LCD_SPI_MOSI
-#define LCD_PIN_MISO           BOARD_LCD_SPI_MISO
-#define LCD_PIN_DC             BOARD_LCD_SPI_DC
-#define LCD_PIN_RST            BOARD_LCD_SPI_RST
-#define LCD_PIN_CS             BOARD_LCD_SPI_CS
-#define LCD_PIN_BK_LIGHT       BOARD_LCD_BACKLIGHT
-
-#define LCD_X_GAP              34
-#define LCD_Y_GAP              0
+#define LOGO_W  360
+#define LOGO_H  360
+extern const uint8_t _binary_aisync_logo_360x360_rgb565_start[];
+extern const uint8_t _binary_aisync_logo_360x360_rgb565_end[];
+#endif
 
 #define LEDC_TIMER             LEDC_TIMER_0
 #define LEDC_MODE              LEDC_LOW_SPEED_MODE
@@ -49,12 +36,17 @@
 
 static const char *TAG = "display";
 
-#if MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
-#error "Waveshare 1.46B uses QSPI LCD + EXIO reset; add QSPI panel implementation before selecting this profile"
-#endif
-
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static uint8_t backlight_percent = 50;
+
+/* ──────────────────────────────────────────────
+ * Xiaozhi ST7789T: custom framebuffer rendering
+ * ────────────────────────────────────────────── */
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_XIAOZHI_ST7789
+
+#define BANNER_W  320
+#define BANNER_H  172
+
 static uint16_t *framebuffer = NULL;
 
 typedef struct {
@@ -158,6 +150,36 @@ static void fb_draw_text_clipped(int x, int y, const char *text, uint16_t color,
     }
 }
 
+#endif /* MIMI_BOARD_XIAOZHI_ST7789 */
+
+/* ──────────────────────────────────────────────
+ * Waveshare 1.46B: LVGL screen objects
+ * ────────────────────────────────────────────── */
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+
+static lv_obj_t *s_scr_banner  = NULL;
+static lv_obj_t *s_scr_config  = NULL;
+static lv_obj_t *s_scr_stdui   = NULL;
+
+/* Config screen LVGL widgets */
+static lv_obj_t *s_cfg_ip_label  = NULL;
+static lv_obj_t *s_cfg_title     = NULL;
+static lv_obj_t *s_cfg_line_labels[12];
+static size_t    s_cfg_line_label_count = 0;
+
+/* Standard UI LVGL widgets */
+static lv_obj_t *s_stdui_title    = NULL;
+static lv_obj_t *s_stdui_subtitle = NULL;
+static lv_obj_t *s_stdui_chip     = NULL;
+static lv_obj_t *s_stdui_footer   = NULL;
+static lv_obj_t *s_stdui_line_labels[12];
+static size_t    s_stdui_line_label_count = 0;
+
+#endif /* MIMI_BOARD_WAVESHARE_146B */
+
+/* ──────────────────────────────────────────────
+ * Backlight (shared: both profiles use LEDC PWM)
+ * ────────────────────────────────────────────── */
 static void backlight_ledc_init(void)
 {
     ledc_timer_config_t ledc_timer = {
@@ -174,7 +196,7 @@ static void backlight_ledc_init(void)
         .channel = LEDC_CHANNEL,
         .timer_sel = LEDC_TIMER,
         .intr_type = LEDC_INTR_DISABLE,
-        .gpio_num = LCD_PIN_BK_LIGHT,
+        .gpio_num = BOARD_LCD_BACKLIGHT,
         .duty = 0,
         .hpoint = 0,
     };
@@ -209,54 +231,27 @@ void display_cycle_backlight(void)
     ESP_LOGI(TAG, "Backlight -> %u%%", next);
 }
 
+/* ──────────────────────────────────────────────
+ * display_init / display_get_panel
+ * ────────────────────────────────────────────── */
 esp_err_t display_init(void)
 {
-    esp_err_t ret = ESP_OK;
-
-    spi_bus_config_t buscfg = {
-        .sclk_io_num = LCD_PIN_SCLK,
-        .mosi_io_num = LCD_PIN_MOSI,
-        .miso_io_num = LCD_PIN_MISO,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = LCD_H_RES * LCD_V_RES * sizeof(uint16_t),
-    };
-    ESP_RETURN_ON_ERROR(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO), TAG, "spi bus init failed");
-
-    esp_lcd_panel_io_handle_t io_handle = NULL;
-    esp_lcd_panel_io_spi_config_t io_config = {
-        .dc_gpio_num = LCD_PIN_DC,
-        .cs_gpio_num = LCD_PIN_CS,
-        .pclk_hz = LCD_PIXEL_CLOCK_HZ,
-        .lcd_cmd_bits = LCD_CMD_BITS,
-        .lcd_param_bits = LCD_PARAM_BITS,
-        .spi_mode = 0,
-        .trans_queue_depth = 10,
-        .on_color_trans_done = NULL,
-        .user_ctx = NULL,
-    };
-    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &io_handle), TAG, "panel io init failed");
-
-    esp_lcd_panel_dev_st7789t_config_t panel_config = {
-        .reset_gpio_num = LCD_PIN_RST,
-        .rgb_endian = LCD_RGB_ENDIAN_BGR,
-        .bits_per_pixel = 16,
-    };
-
-    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7789t(io_handle, &panel_config, &panel_handle), TAG, "panel init failed");
-    ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(panel_handle), TAG, "panel reset failed");
-    ESP_RETURN_ON_ERROR(esp_lcd_panel_init(panel_handle), TAG, "panel init failed");
-    ESP_RETURN_ON_ERROR(esp_lcd_panel_mirror(panel_handle, true, true), TAG, "panel mirror failed");
-    ESP_RETURN_ON_ERROR(esp_lcd_panel_swap_xy(panel_handle, true), TAG, "panel swap failed");
-    ESP_RETURN_ON_ERROR(esp_lcd_panel_set_gap(panel_handle, LCD_Y_GAP, LCD_X_GAP), TAG, "panel gap failed");
-    ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "panel on failed");
+    ESP_RETURN_ON_ERROR(display_panel_create(&panel_handle), TAG, "panel create failed");
 
     backlight_ledc_init();
     display_set_backlight_percent(backlight_percent);
 
-    return ret;
+    return ESP_OK;
 }
 
+esp_lcd_panel_handle_t display_get_panel(void)
+{
+    return panel_handle;
+}
+
+/* ──────────────────────────────────────────────
+ * display_show_banner
+ * ────────────────────────────────────────────── */
 void display_show_banner(void)
 {
     if (!panel_handle) {
@@ -264,6 +259,7 @@ void display_show_banner(void)
         return;
     }
 
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_XIAOZHI_ST7789
     const uint8_t *start = _binary_banner_320x172_rgb565_start;
     const uint8_t *end = _binary_banner_320x172_rgb565_end;
     size_t len = (size_t)(end - start);
@@ -272,9 +268,41 @@ void display_show_banner(void)
         ESP_LOGW(TAG, "banner data too small (%u < %u)", (unsigned)len, (unsigned)expected);
         return;
     }
-
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, BANNER_W, BANNER_H, start));
+
+#elif MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+    lvgl_adapter_lock();
+    if (!s_scr_banner) {
+        s_scr_banner = lv_obj_create(NULL);
+        lv_obj_set_style_bg_color(s_scr_banner, lv_color_hex(0x000000), 0);
+        lv_obj_set_style_bg_opa(s_scr_banner, LV_OPA_COVER, 0);
+
+        /* AiSync gear logo — centered, fills the round display */
+        static lv_image_dsc_t logo_dsc = {
+            .header = {
+                .cf = LV_COLOR_FORMAT_RGB565,
+                .w  = LOGO_W,
+                .h  = LOGO_H,
+            },
+            .data_size = LOGO_W * LOGO_H * 2,
+            .data = NULL,
+        };
+        logo_dsc.data = _binary_aisync_logo_360x360_rgb565_start;
+
+        lv_obj_t *logo = lv_image_create(s_scr_banner);
+        lv_image_set_src(logo, &logo_dsc);
+        lv_obj_center(logo);
+    }
+    lv_scr_load(s_scr_banner);
+    lv_obj_invalidate(s_scr_banner);
+    lvgl_adapter_unlock();
+#endif
 }
+
+/* ──────────────────────────────────────────────
+ * display_show_config_screen
+ * ────────────────────────────────────────────── */
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_XIAOZHI_ST7789
 
 static void qr_draw_cb(esp_qrcode_handle_t qrcode)
 {
@@ -297,6 +325,8 @@ static void qr_draw_cb(esp_qrcode_handle_t qrcode)
     }
 }
 
+#endif /* MIMI_BOARD_XIAOZHI_ST7789 */
+
 void display_show_config_screen(const char *qr_text, const char *ip_text,
                                 const char **lines, size_t line_count, size_t scroll,
                                 size_t selected, int selected_offset_px)
@@ -309,6 +339,7 @@ void display_show_config_screen(const char *qr_text, const char *ip_text,
         return;
     }
 
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_XIAOZHI_ST7789
     fb_ensure();
     if (!framebuffer) {
         ESP_LOGW(TAG, "framebuffer alloc failed");
@@ -324,7 +355,6 @@ void display_show_config_screen(const char *qr_text, const char *ip_text,
 
     fb_fill_rect(0, 0, BANNER_W, BANNER_H, color_bg);
 
-    // QR area (left column)
     const int left_pad = 6;
     const int qr_box = 110;
     const int qr_x = left_pad;
@@ -341,13 +371,10 @@ void display_show_config_screen(const char *qr_text, const char *ip_text,
     cfg.display_func = qr_draw_cb;
     cfg.max_qrcode_version = 6;
     cfg.qrcode_ecc_level = ESP_QRCODE_ECC_MED;
-
     esp_qrcode_generate(&cfg, qr_text);
 
-    // IP text under QR
     fb_draw_text_clipped(qr_x, qr_y + qr_box + 4, ip_text, color_fg, 10, 1, 0, BANNER_W);
 
-    // Right column
     const int right_x = qr_x + qr_box + 10;
     const int right_w = BANNER_W - right_x - 6;
     (void)right_w;
@@ -374,8 +401,70 @@ void display_show_config_screen(const char *qr_text, const char *ip_text,
     }
 
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, BANNER_W, BANNER_H, framebuffer));
+
+#elif MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+    lvgl_adapter_lock();
+
+    if (!s_scr_config) {
+        s_scr_config = lv_obj_create(NULL);
+        lv_obj_set_style_bg_color(s_scr_config, lv_color_hex(0x000000), 0);
+        lv_obj_set_style_bg_opa(s_scr_config, LV_OPA_COVER, 0);
+        lv_obj_set_flex_flow(s_scr_config, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_all(s_scr_config, 20, 0);
+        lv_obj_set_style_pad_row(s_scr_config, 4, 0);
+
+        /* Title */
+        s_cfg_title = lv_label_create(s_scr_config);
+        lv_obj_set_style_text_color(s_cfg_title, lv_color_hex(0x64C8FF), 0);
+        lv_obj_set_style_text_font(s_cfg_title, &lv_font_montserrat_20, 0);
+        lv_label_set_text(s_cfg_title, "Configuration");
+
+        /* IP label */
+        s_cfg_ip_label = lv_label_create(s_scr_config);
+        lv_obj_set_style_text_color(s_cfg_ip_label, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_text_font(s_cfg_ip_label, &lv_font_montserrat_14, 0);
+
+        /* Config lines */
+        s_cfg_line_label_count = 0;
+    }
+
+    lv_label_set_text(s_cfg_ip_label, ip_text);
+
+    /* Remove old line labels and recreate */
+    for (size_t i = 0; i < s_cfg_line_label_count; i++) {
+        lv_obj_del(s_cfg_line_labels[i]);
+    }
+    s_cfg_line_label_count = 0;
+
+    size_t max_lines = line_count < 12 ? line_count : 12;
+    for (size_t i = 0; i < max_lines; i++) {
+        size_t idx = (scroll + i) % line_count;
+        lv_obj_t *lbl = lv_label_create(s_scr_config);
+        lv_label_set_text(lbl, lines[idx]);
+        lv_label_set_long_mode(lbl, LV_LABEL_LONG_SCROLL_CIRCULAR);
+        lv_obj_set_width(lbl, DISPLAY_WIDTH - 50);
+        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
+
+        if (idx == selected) {
+            lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_bg_color(lbl, lv_color_hex(0x325078), 0);
+            lv_obj_set_style_bg_opa(lbl, LV_OPA_COVER, 0);
+            lv_obj_set_style_pad_all(lbl, 2, 0);
+        } else {
+            lv_obj_set_style_text_color(lbl, lv_color_hex(0xC0C0C0), 0);
+        }
+
+        s_cfg_line_labels[s_cfg_line_label_count++] = lbl;
+    }
+
+    lv_scr_load(s_scr_config);
+    lvgl_adapter_unlock();
+#endif
 }
 
+/* ──────────────────────────────────────────────
+ * display_show_standard_ui_screen
+ * ────────────────────────────────────────────── */
 void display_show_standard_ui_screen(const char *title, const char *subtitle,
                                      const char *status_chip, const char **lines,
                                      size_t line_count, const char *footer_hint)
@@ -388,6 +477,7 @@ void display_show_standard_ui_screen(const char *title, const char *subtitle,
         return;
     }
 
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_XIAOZHI_ST7789
     fb_ensure();
     if (!framebuffer) {
         ESP_LOGW(TAG, "framebuffer alloc failed");
@@ -420,14 +510,103 @@ void display_show_standard_ui_screen(const char *title, const char *subtitle,
 
     fb_draw_text_clipped(8, BANNER_H - 14, footer_hint, color_muted, 10, 1, 8, BANNER_W - 8);
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, BANNER_W, BANNER_H, framebuffer));
+
+#elif MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+    lvgl_adapter_lock();
+
+    if (!s_scr_stdui) {
+        s_scr_stdui = lv_obj_create(NULL);
+        lv_obj_set_style_bg_color(s_scr_stdui, lv_color_hex(0x080C14), 0);
+        lv_obj_set_style_bg_opa(s_scr_stdui, LV_OPA_COVER, 0);
+
+        /* Header bar */
+        lv_obj_t *header = lv_obj_create(s_scr_stdui);
+        lv_obj_set_size(header, DISPLAY_WIDTH, 50);
+        lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_set_style_bg_color(header, lv_color_hex(0x172A4A), 0);
+        lv_obj_set_style_bg_opa(header, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(header, 0, 0);
+        lv_obj_set_style_radius(header, 0, 0);
+        lv_obj_set_style_pad_all(header, 8, 0);
+
+        s_stdui_title = lv_label_create(header);
+        lv_obj_set_style_text_color(s_stdui_title, lv_color_hex(0xE6EDF6), 0);
+        lv_obj_set_style_text_font(s_stdui_title, &lv_font_montserrat_16, 0);
+        lv_obj_align(s_stdui_title, LV_ALIGN_LEFT_MID, 0, 0);
+
+        s_stdui_chip = lv_label_create(header);
+        lv_obj_set_style_text_color(s_stdui_chip, lv_color_hex(0x080C14), 0);
+        lv_obj_set_style_text_font(s_stdui_chip, &lv_font_montserrat_12, 0);
+        lv_obj_set_style_bg_color(s_stdui_chip, lv_color_hex(0x44BD78), 0);
+        lv_obj_set_style_bg_opa(s_stdui_chip, LV_OPA_COVER, 0);
+        lv_obj_set_style_pad_all(s_stdui_chip, 4, 0);
+        lv_obj_set_style_radius(s_stdui_chip, 4, 0);
+        lv_obj_align(s_stdui_chip, LV_ALIGN_RIGHT_MID, 0, 0);
+
+        /* Card body */
+        lv_obj_t *card = lv_obj_create(s_scr_stdui);
+        lv_obj_set_size(card, DISPLAY_WIDTH - 30, DISPLAY_HEIGHT - 120);
+        lv_obj_align(card, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_bg_color(card, lv_color_hex(0x101826), 0);
+        lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(card, 0, 0);
+        lv_obj_set_style_radius(card, 8, 0);
+        lv_obj_set_style_pad_all(card, 12, 0);
+        lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_row(card, 6, 0);
+
+        s_stdui_subtitle = lv_label_create(card);
+        lv_obj_set_style_text_color(s_stdui_subtitle, lv_color_hex(0x879AB4), 0);
+        lv_obj_set_style_text_font(s_stdui_subtitle, &lv_font_montserrat_12, 0);
+
+        /* Pre-create line labels */
+        s_stdui_line_label_count = 0;
+        for (int i = 0; i < 12; i++) {
+            lv_obj_t *lbl = lv_label_create(card);
+            lv_obj_set_style_text_color(lbl, lv_color_hex(0xE6EDF6), 0);
+            lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
+            lv_obj_add_flag(lbl, LV_OBJ_FLAG_HIDDEN);
+            s_stdui_line_labels[i] = lbl;
+        }
+
+        /* Footer */
+        s_stdui_footer = lv_label_create(s_scr_stdui);
+        lv_obj_set_style_text_color(s_stdui_footer, lv_color_hex(0x879AB4), 0);
+        lv_obj_set_style_text_font(s_stdui_footer, &lv_font_montserrat_12, 0);
+        lv_obj_align(s_stdui_footer, LV_ALIGN_BOTTOM_MID, 0, -10);
+    }
+
+    /* Update content */
+    lv_label_set_text(s_stdui_title, title);
+    lv_label_set_text(s_stdui_subtitle, subtitle);
+    lv_label_set_text(s_stdui_chip, status_chip);
+    lv_label_set_text(s_stdui_footer, footer_hint);
+
+    size_t max_lines = line_count < 12 ? line_count : 12;
+    for (size_t i = 0; i < 12; i++) {
+        if (i < max_lines) {
+            lv_label_set_text(s_stdui_line_labels[i], lines[i]);
+            lv_obj_clear_flag(s_stdui_line_labels[i], LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(s_stdui_line_labels[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    lv_scr_load(s_scr_stdui);
+    lvgl_adapter_unlock();
+#endif
 }
 
+/* ──────────────────────────────────────────────
+ * display_get_banner_center_rgb
+ * ────────────────────────────────────────────── */
 bool display_get_banner_center_rgb(uint8_t *r, uint8_t *g, uint8_t *b)
 {
     if (!r || !g || !b) {
         return false;
     }
 
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_XIAOZHI_ST7789
     const uint8_t *start = _binary_banner_320x172_rgb565_start;
     const uint8_t *end = _binary_banner_320x172_rgb565_end;
     size_t len = (size_t)(end - start);
@@ -449,4 +628,14 @@ bool display_get_banner_center_rgb(uint8_t *r, uint8_t *g, uint8_t *b)
     *g = (uint8_t)((g6 * 255) / 63);
     *b = (uint8_t)((b5 * 255) / 31);
     return true;
+
+#elif MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+    /* No embedded banner for round display; return a default color */
+    *r = 8;
+    *g = 20;
+    *b = 32;
+    return true;
+#else
+    return false;
+#endif
 }

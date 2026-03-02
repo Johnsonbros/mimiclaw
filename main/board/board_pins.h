@@ -47,6 +47,7 @@
 #define BOARD_TOUCH_INT             4
 
 // RST lines are exposed through onboard TCA9554 (EXIO), not direct ESP32 GPIO.
+#define BOARD_EXIO_I2C_ADDR         0x20
 #define BOARD_LCD_RST_EXIO          2
 #define BOARD_TOUCH_RST_EXIO        1
 

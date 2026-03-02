@@ -1,4 +1,6 @@
 #include "I2C_Driver.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 
 #define I2C_TRANS_BUF_MINIMUM_SIZE     (sizeof(i2c_cmd_desc_t) + \
@@ -7,6 +9,9 @@
                                                                      * start + write (device address) + read buffer + read buffer for NACK +
                                                                      * stop */
 static const char *I2C_TAG = "I2C";
+static bool s_initialized = false;
+static SemaphoreHandle_t s_i2c_mutex = NULL;
+
 /**
  * @brief i2c master initialization
  */
@@ -29,9 +34,30 @@ static esp_err_t i2c_master_init(void)
 }
 void I2C_Init(void)
 {
+    if (s_initialized) {
+        return;
+    }
+    s_i2c_mutex = xSemaphoreCreateMutex();
+    assert(s_i2c_mutex);
+
     /********************* I2C *********************/
     ESP_ERROR_CHECK(i2c_master_init());
-    ESP_LOGI(I2C_TAG, "I2C initialized successfully");  
+    ESP_LOGI(I2C_TAG, "I2C initialized successfully");
+    s_initialized = true;
+}
+
+void I2C_Lock(void)
+{
+    if (s_i2c_mutex) {
+        xSemaphoreTake(s_i2c_mutex, portMAX_DELAY);
+    }
+}
+
+void I2C_Unlock(void)
+{
+    if (s_i2c_mutex) {
+        xSemaphoreGive(s_i2c_mutex);
+    }
 }
 
 
@@ -39,16 +65,23 @@ void I2C_Init(void)
 esp_err_t I2C_Write(uint8_t Driver_addr, uint8_t Reg_addr, const uint8_t *Reg_data, uint32_t Length)
 {
     uint8_t buf[Length+1];
-    
+
     buf[0] = Reg_addr;
     // Copy Reg_data to buf starting at buf[1]
     memcpy(&buf[1], Reg_data, Length);
-    return i2c_master_write_to_device(I2C_MASTER_NUM, Driver_addr, buf, Length+1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+
+    I2C_Lock();
+    esp_err_t ret = i2c_master_write_to_device(I2C_MASTER_NUM, Driver_addr, buf, Length+1, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    I2C_Unlock();
+    return ret;
 }
 
 
 
 esp_err_t I2C_Read(uint8_t Driver_addr, uint8_t Reg_addr, uint8_t *Reg_data, uint32_t Length)
 {
-    return i2c_master_write_read_device(I2C_MASTER_NUM, Driver_addr, &Reg_addr, 1, Reg_data, Length, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    I2C_Lock();
+    esp_err_t ret = i2c_master_write_read_device(I2C_MASTER_NUM, Driver_addr, &Reg_addr, 1, Reg_data, Length, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+    I2C_Unlock();
+    return ret;
 }

@@ -4,15 +4,23 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "esp_err.h"
+#include "esp_lcd_panel_ops.h"
+#include "board/board_pins.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+#define DISPLAY_WIDTH 412
+#define DISPLAY_HEIGHT 412
+#else
 #define DISPLAY_WIDTH 320
 #define DISPLAY_HEIGHT 172
+#endif
 
 esp_err_t display_init(void);
+esp_lcd_panel_handle_t display_get_panel(void);
 void display_show_banner(void);
 void display_set_backlight_percent(uint8_t percent);
 uint8_t display_get_backlight_percent(void);

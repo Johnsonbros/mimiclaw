@@ -49,7 +49,7 @@ static void render_boot_status(void)
     snprintf(s_lines[5], UI_LINE_MAX, "Display: %dx%d", DISPLAY_WIDTH, DISPLAY_HEIGHT);
     snprintf(s_lines[6], UI_LINE_MAX, "Power: USB");
 
-    display_show_standard_ui_screen("MimiClaw Standard UI", "Boot & system status",
+    display_show_standard_ui_screen("DOT", "Boot & system status",
                                     "READY", s_line_ptrs, UI_LINES_PER_SCREEN,
                                     "single: brightness  double: next screen");
 }
@@ -75,7 +75,7 @@ static void render_setup_status(void)
     snprintf(s_lines[5], UI_LINE_MAX, "CLI: config_show");
     snprintf(s_lines[6], UI_LINE_MAX, "Persist: NVS + SPIFFS");
 
-    display_show_standard_ui_screen("MimiClaw Standard UI", "Onboarding and setup",
+    display_show_standard_ui_screen("DOT", "Onboarding and setup",
                                     "SETUP", s_line_ptrs, UI_LINES_PER_SCREEN,
                                     "shake: config  single: brightness");
 }
@@ -90,7 +90,7 @@ static void render_assistant_status(void)
     snprintf(s_lines[5], UI_LINE_MAX, "Cron: autonomous scheduled tasks");
     snprintf(s_lines[6], UI_LINE_MAX, "Privacy: local flash storage");
 
-    display_show_standard_ui_screen("MimiClaw Standard UI", "Assistant activity overview",
+    display_show_standard_ui_screen("DOT", "Assistant activity overview",
                                     "AGENT", s_line_ptrs, UI_LINES_PER_SCREEN,
                                     "double: cycle views  shake: config");
 }

@@ -28,6 +28,13 @@
 #include "imu/imu_manager.h"
 #include "rgb/rgb.h"
 #include "skills/skill_loader.h"
+#include "cron/cron_service.h"
+#include "heartbeat/heartbeat.h"
+#include "board/board_pins.h"
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+#include "imu/I2C_Driver.h"
+#include "ui/lvgl_adapter.h"
+#endif
 
 static const char *TAG = "mimi";
 
@@ -95,7 +102,7 @@ void app_main(void)
     esp_log_level_set("esp-x509-crt-bundle", ESP_LOG_WARN);
 
     ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "  MimiClaw - ESP32-S3 AI Agent");
+    ESP_LOGI(TAG, "  DOT - AiSync Services");
     ESP_LOGI(TAG, "========================================");
 
     /* Print memory info */
@@ -105,7 +112,13 @@ void app_main(void)
              (int)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     /* Display + input */
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+    I2C_Init();  /* TCA9554 + touch + IMU share this bus; init before display */
+#endif
     ESP_ERROR_CHECK(display_init());
+#if MIMI_BOARD_PROFILE == MIMI_BOARD_WAVESHARE_146B
+    lvgl_adapter_init(display_get_panel());
+#endif
     display_show_banner();
     ESP_ERROR_CHECK(rgb_init());
     rgb_set(255, 0, 0);
@@ -167,5 +180,5 @@ void app_main(void)
         ESP_LOGW(TAG, "No WiFi credentials. Set MIMI_SECRET_WIFI_SSID in mimi_secrets.h");
     }
 
-    ESP_LOGI(TAG, "MimiClaw ready. Type 'help' for CLI commands.");
+    ESP_LOGI(TAG, "DOT ready. Type 'help' for CLI commands.");
 }

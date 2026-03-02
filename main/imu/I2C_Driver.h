@@ -19,6 +19,8 @@
 
 
 void I2C_Init(void);
+void I2C_Lock(void);
+void I2C_Unlock(void);
 // Reg addr is 8 bit
 esp_err_t I2C_Write(uint8_t Driver_addr, uint8_t Reg_addr, const uint8_t *Reg_data, uint32_t Length);
 esp_err_t I2C_Read(uint8_t Driver_addr, uint8_t Reg_addr, uint8_t *Reg_data, uint32_t Length);
